@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 <Response>
   <Say voice="alice">${escapeXml(aiResponse)}</Say>
   <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
-    <Say>What would you like to talk about next?</Say>
+    
   </Gather>
   <Say>Thank you for calling. Take care of yourself.</Say>
 </Response>`
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
 <Response>
   <Say voice="alice">I'm sorry, I'm having trouble responding right now. Please try again.</Say>
   <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
-    <Say>What would you like to talk about next?</Say>
+    
   </Gather>
   <Say>Thank you for calling. Take care of yourself.</Say>
 </Response>`
