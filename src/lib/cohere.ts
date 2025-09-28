@@ -5,19 +5,13 @@ const cohere = new CohereClient({
   token: process.env.COHERE_API_KEY
 })
 
-export interface AIResponse {
-  response: string;
-  needsEscalation: boolean;
-  escalationReason: string;
-}
-
-export async function getAIResponse(input: string, callId: string): Promise<AIResponse> {
+export async function getAIResponse(input: string, callId: string): Promise<string> {
   // Get conversation
   const call = await prisma.call.findUnique({
     where: { id: callId },
     include: { conversation: { include: { messages: true } } }
   })
-  if (!call || !call.conversation) return { response: 'Sorry, there was an error.', needsEscalation: false, escalationReason: '' }
+  if (!call || !call.conversation) return 'Sorry, there was an error.'
 
   const conversation = call.conversation
 
@@ -30,8 +24,9 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
     }
   })
 
-  // Get messages for Cohere
-  const chatHistory = conversation.messages.map(m => ({
+  // Get messages for Cohere (last 5 messages for speed)
+  const recentMessages = conversation.messages.slice(-5)
+  const chatHistory = recentMessages.map(m => ({
     role: m.role === 'assistant' ? ('CHATBOT' as const) : ('USER' as const),
     message: m.content
   }))
@@ -43,11 +38,11 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
       message: input,
       chatHistory,
       preamble: 'You are a compassionate mental health AI assistant. Listen actively, provide support, and detect if the user needs professional help. If they mention suicide or self-harm, suggest immediate help.',
-      maxTokens: 150
+      maxTokens: 100
     })
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('AI response timeout')), 10000) // 10 seconds
+      setTimeout(() => reject(new Error('AI response timeout')), 2000) // 2 seconds
     )
 
     const response = await Promise.race([chatPromise, timeoutPromise]) as any
@@ -63,30 +58,18 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
       }
     })
 
-    // Check for escalation
-    const needsEscalation = input.toLowerCase().includes('suicide') ||
-                           input.toLowerCase().includes('kill myself') ||
-                           input.toLowerCase().includes('self-harm') ||
-                           input.toLowerCase().includes('professional') ||
-                           input.toLowerCase().includes('therapist') ||
-                           input.toLowerCase().includes('counselor') ||
-                           input.toLowerCase().includes('help me professionally')
-
-    let escalationReason = ''
-    if (needsEscalation) {
-      if (input.toLowerCase().includes('suicide') || input.toLowerCase().includes('kill myself') || input.toLowerCase().includes('self-harm')) {
-        escalationReason = 'crisis'
-      } else {
-        escalationReason = 'requested_professional'
-      }
+    // Check for crisis
+    if (input.toLowerCase().includes('suicide') || input.toLowerCase().includes('kill myself') || input.toLowerCase().includes('self-harm')) {
+      // TODO: handle crisis
+      return aiResponse + ' Please call emergency services at 911 if you\'re in immediate danger.'
     }
 
-    return { response: aiResponse, needsEscalation, escalationReason }
+    return aiResponse
   } catch (error) {
     console.error('Cohere error:', error)
     if ((error as Error).message === 'AI response timeout') {
-      return { response: 'I\'m taking a bit longer to respond. Please hold on.', needsEscalation: false, escalationReason: '' }
+      return 'I\'m taking a bit longer to respond. Please hold on.'
     }
-    return { response: 'I\'m sorry, I\'m having trouble responding right now. Please try again.', needsEscalation: false, escalationReason: '' }
+    return 'I\'m sorry, I\'m having trouble responding right now. Please try again.'
   }
 }

@@ -6,29 +6,23 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id          String   @id @default(cuid()) @map("_id")
-  email       String?  
-  phone       String?  @unique
-  name        String?
-  role        String   // 'user' or 'counselor'
-  // Counselor-specific fields
-  status      String?  @default("available") // 'available', 'busy', 'offline'
-  specialties String[] // Areas of expertise
-  license     String?  // Professional license info
-  bio         String?  // Professional bio
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid()) @map("_id")
+  email     String?  @unique
+  phone     String?  @unique
+  name      String?
+  role      String   // 'user' or 'counselor'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   moodEntries   MoodEntry[]
   conversations Conversation[]
   calls         Call[]
   escalations   Escalation[]
-  assignedCalls Call[] @relation("AssignedCounselor")
 }
 
 model MoodEntry {
@@ -64,15 +58,11 @@ model Call {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   twilioCallSid  String       @unique
-  status         String       // 'ongoing', 'completed', 'escalated', 'ai_handling', 'counselor_assigned'
-  assignedCounselorId String?
-  assignedCounselor   User?    @relation("AssignedCounselor", fields: [assignedCounselorId], references: [id])
+  status         String       // 'ongoing', 'completed', 'escalated'
   startedAt      DateTime     @default(now())
   endedAt        DateTime?
   conversation   Conversation?
   escalation     Escalation?
-
-  @@map("calls")
 }
 
 model Escalation {

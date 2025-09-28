@@ -2,7 +2,8 @@ import OpenAI from 'openai'
 import { prisma } from './prisma'
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1'
 })
 
 export async function getAIResponse(input: string, callId: string): Promise<string> {
@@ -24,8 +25,9 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
     }
   })
 
-  // Get messages for OpenAI
-  const messages = conversation.messages.map(m => ({
+  // Get messages for OpenAI (last 5 messages for speed)
+  const recentMessages = conversation.messages.slice(-5)
+  const messages = recentMessages.map(m => ({
     role: m.role as 'user' | 'assistant' | 'system',
     content: m.content
   }))
@@ -39,13 +41,13 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
   try {
     // Add timeout to prevent hanging
     const completionPromise = openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages,
-      max_tokens: 150
+      max_tokens: 100
     })
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('AI response timeout')), 10000) // 10 seconds
+      setTimeout(() => reject(new Error('AI response timeout')), 5000) // 5 seconds
     )
 
     const completion = await Promise.race([completionPromise, timeoutPromise]) as any
@@ -70,7 +72,7 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
     return response
   } catch (error) {
     console.error('OpenAI error:', error)
-    if (error.message === 'AI response timeout') {
+    if ((error as Error).message === 'AI response timeout') {
       return 'I\'m taking a bit longer to respond. Please hold on.'
     }
     return 'I\'m sorry, I\'m having trouble responding right now. Please try again.'
