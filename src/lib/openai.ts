@@ -50,7 +50,7 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
       setTimeout(() => reject(new Error('AI response timeout')), 5000) // 5 seconds
     )
 
-    const completion = await Promise.race([completionPromise, timeoutPromise]) as any
+    const completion = await Promise.race([completionPromise, timeoutPromise]) as { choices: { message: { content: string } }[] }
 
     const response = completion.choices[0].message.content || 'I\'m here to listen.'
 

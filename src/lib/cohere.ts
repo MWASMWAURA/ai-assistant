@@ -45,7 +45,7 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
       setTimeout(() => reject(new Error('AI response timeout')), 2000) // 2 seconds
     )
 
-    const response = await Promise.race([chatPromise, timeoutPromise]) as any
+    const response = await Promise.race([chatPromise, timeoutPromise]) as { text: string }
 
     const aiResponse = response.text || 'I\'m here to listen.'
 
