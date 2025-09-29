@@ -1,54 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Get recent calls
-    const recentCalls = await prisma.call.findMany({
+    // Get ongoing AI calls (active within last 10 minutes)
+    const tenMinutesAgo = new Date()
+    tenMinutesAgo.setMinutes(tenMinutesAgo.getMinutes() - 10)
+
+    const ongoingCalls = await prisma.call.findMany({
+      where: {
+        status: 'ai_handling'
+      },
+      include: {
+        user: true,
+        conversation: { include: { messages: { orderBy: { timestamp: 'desc' }, take: 5 } } }
+      },
+      orderBy: { startedAt: 'desc' }
+    })
+
+    // Debug: Also get all calls to see what's in the database
+    const allCalls = await prisma.call.findMany({
+      select: { id: true, status: true, twilioCallSid: true, startedAt: true },
+      orderBy: { startedAt: 'desc' },
+      take: 10
+    })
+    console.log('All recent calls:', allCalls)
+
+    // Get stats for today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const [completedTodayCount, totalEscalationsCount] = await Promise.all([
+      prisma.call.count({
+        where: {
+          status: { not: 'ai_handling' },
+          startedAt: { gte: today, lt: tomorrow }
+        }
+      }),
+      prisma.escalation.count()
+    ])
+
+    // Get call logs (completed calls) - increase limit
+    const callLogs = await prisma.call.findMany({
+      where: { status: { not: 'ai_handling' } },
       include: {
         user: true,
         escalation: { include: { counselor: true } }
       },
       orderBy: { startedAt: 'desc' },
-      take: 10
+      take: 50 // Increased limit
     })
-
-    // Get mood trends (last 30 days)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-    const moodEntries = await prisma.moodEntry.findMany({
-      where: { date: { gte: thirtyDaysAgo } },
-      orderBy: { date: 'asc' }
-    })
-
-    // Group by date
-    const moodTrends = moodEntries.reduce((acc, entry) => {
-      const date = entry.date.toISOString().split('T')[0]
-      if (!acc[date]) acc[date] = { total: 0, count: 0 }
-      acc[date].total += entry.mood
-      acc[date].count += 1
-      return acc
-    }, {} as Record<string, { total: number; count: number }>)
-
-    const trends = Object.entries(moodTrends).map(([date, { total, count }]) => ({
-      date,
-      averageMood: total / count
-    }))
 
     // Get escalations
     const escalations = await prisma.escalation.findMany({
       include: { call: { include: { user: true } }, counselor: true },
       orderBy: { escalatedAt: 'desc' },
-      take: 10
+      take: 20
     })
 
+    console.log(`Dashboard data: ${ongoingCalls.length} ongoing calls, ${callLogs.length} call logs, ${escalations.length} escalations`)
+
     return NextResponse.json({
-      recentCalls,
-      moodTrends: trends,
-      escalations
+      ongoingCalls,
+      callLogs,
+      escalations,
+      stats: {
+        completedToday: completedTodayCount,
+        totalEscalations: totalEscalationsCount
+      }
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
   }
 }

@@ -40,13 +40,48 @@ export async function POST(request: NextRequest) {
     const callSid = formData.get('CallSid') as string
     const from = formData.get('From') as string
     const to = formData.get('To') as string
+    const callStatus = formData.get('CallStatus') as string
 
     console.log('Twilio webhook data:', {
       speechResult,
       callSid,
       from,
-      to
+      to,
+      callStatus
     })
+
+    // Handle call status updates (when call ends)
+    if (callStatus && ['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(callStatus)) {
+      console.log(`Call ${callSid} ended with status: ${callStatus}`)
+
+      // Update call status in database
+      const existingCall = await prisma.call.findUnique({
+        where: { twilioCallSid: callSid }
+      })
+
+      if (existingCall && existingCall.status !== 'completed') {
+        await prisma.call.update({
+          where: { id: existingCall.id },
+          data: {
+            status: 'completed',
+            endedAt: new Date()
+          }
+        })
+
+        // Free up assigned counselor if call was assigned
+        if (existingCall.assignedCounselorId) {
+          await prisma.user.update({
+            where: { id: existingCall.assignedCounselorId },
+            data: { status: 'available' }
+          })
+        }
+
+        console.log(`Updated call ${existingCall.id} to completed and freed counselor`)
+      }
+
+      // Return empty response for status updates
+      return new NextResponse('', { status: 200 })
+    }
 
     // If this is the initial call (no speech result yet)
     if (!speechResult) {
@@ -54,7 +89,7 @@ export async function POST(request: NextRequest) {
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Hello! I'm your mental health support assistant. How are you feeling today?</Say>
-  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
+  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10" statusCallback="/api/twilio/webhook" statusCallbackEvent="completed">
     <Say>Please speak after the beep, and I'll listen.</Say>
   </Gather>
   <Say>I didn't hear anything. Please try calling again.</Say>
@@ -105,8 +140,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Get AI response
+        console.log('Getting AI response for input:', speechResult)
         const aiResult = await getAIResponse(speechResult, call.id)
-        console.log('AI response:', aiResult)
+        console.log('AI response received:', aiResult)
+        console.log('Response text length:', aiResult.response?.length || 0)
 
         if (aiResult.needsEscalation) {
           // Generate conversation summary
@@ -162,16 +199,24 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Ensure response is not empty
+        let cleanResponse = aiResult.response.replace(/[<>&'"]/g, '').trim()
+        if (!cleanResponse) {
+          cleanResponse = "I'm here to listen. How are you feeling?"
+        }
+        console.log('Clean response:', cleanResponse)
+
         // Continue normal conversation
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${aiResult.response.replace(/[<>&'"]/g, '')}</Say>
-  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
+  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10" statusCallback="/api/twilio/webhook" statusCallbackEvent="completed">
+    <Say voice="alice">${cleanResponse}</Say>
     <Say>What would you like to talk about next?</Say>
   </Gather>
   <Say>Thank you for calling. Take care of yourself.</Say>
 </Response>`
 
+        console.log('Returning XML response:', xml)
         return new NextResponse(xml, {
           headers: { 'Content-Type': 'text/xml' }
         })
@@ -181,12 +226,13 @@ export async function POST(request: NextRequest) {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">I'm sorry, I'm having trouble responding right now. Please try again.</Say>
-  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
+  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10" statusCallback="/api/twilio/webhook" statusCallbackEvent="completed">
     <Say>What would you like to talk about next?</Say>
   </Gather>
   <Say>Thank you for calling. Take care of yourself.</Say>
 </Response>`
 
+        console.log('Returning fallback XML due to database error:', xml)
         return new NextResponse(xml, {
           headers: { 'Content-Type': 'text/xml' }
         })
@@ -197,7 +243,7 @@ export async function POST(request: NextRequest) {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">I didn't catch that. Could you please repeat?</Say>
-  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10">
+  <Gather input="speech" action="/api/twilio/webhook" method="POST" speechTimeout="3" timeout="10" statusCallback="/api/twilio/webhook" statusCallbackEvent="completed">
     <Say>Please speak clearly after the beep.</Say>
   </Gather>
   <Say>Thank you for calling. Take care.</Say>

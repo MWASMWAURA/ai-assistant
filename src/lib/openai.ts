@@ -48,7 +48,7 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
       setTimeout(() => reject(new Error('AI response timeout')), 10000) // 10 seconds
     )
 
-    const completion = await Promise.race([completionPromise, timeoutPromise]) as any
+    const completion = await Promise.race([completionPromise, timeoutPromise]) as { choices: { message: { content: string } }[] }
 
     const response = completion.choices[0].message.content || 'I\'m here to listen.'
 
@@ -70,7 +70,7 @@ export async function getAIResponse(input: string, callId: string): Promise<stri
     return response
   } catch (error) {
     console.error('OpenAI error:', error)
-    if (error.message === 'AI response timeout') {
+    if (error instanceof Error && error.message === 'AI response timeout') {
       return 'I\'m taking a bit longer to respond. Please hold on.'
     }
     return 'I\'m sorry, I\'m having trouble responding right now. Please try again.'

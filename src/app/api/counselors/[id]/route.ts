@@ -28,7 +28,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Map for frontend
     const mappedCounselor = {
       ...counselor,
-      isAvailable: counselor.status === 'available'
+      isAvailable: counselor.status === 'available',
+      specialties: counselor.specialties ? JSON.parse(counselor.specialties) : []
     }
 
     return NextResponse.json(mappedCounselor)

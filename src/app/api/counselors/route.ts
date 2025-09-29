@@ -20,7 +20,8 @@ export async function GET() {
     // Map the status field to isAvailable for the frontend
     const mappedCounselors = counselors.map(counselor => ({
       ...counselor,
-      isAvailable: counselor.status === 'available'
+      isAvailable: counselor.status === 'available',
+      specialties: counselor.specialties ? JSON.parse(counselor.specialties) : []
     }))
 
     return NextResponse.json(mappedCounselors)
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
         phone: trimmedPhone,
         role: 'counselor',
         status: 'available',
-        specialties,
+        specialties: JSON.stringify(specialties),
         license,
         bio
       },
@@ -94,7 +95,8 @@ export async function POST(request: NextRequest) {
     // Map for frontend
     const mappedCounselor = {
       ...counselor,
-      isAvailable: counselor.status === 'available'
+      isAvailable: counselor.status === 'available',
+      specialties: counselor.specialties ? JSON.parse(counselor.specialties) : []
     }
 
     return NextResponse.json(mappedCounselor, { status: 201 })

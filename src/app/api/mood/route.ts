@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(entry)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to save mood entry' }, { status: 500 })
   }
 }
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(entries)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch mood entries' }, { status: 500 })
   }
 }

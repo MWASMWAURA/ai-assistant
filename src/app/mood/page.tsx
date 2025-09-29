@@ -5,7 +5,7 @@ import { useState } from "react";
 export default function MoodTracker() {
   const [mood, setMood] = useState(5);
   const [note, setNote] = useState("");
-  const [userId, setUserId] = useState("user-1"); // TODO: get from auth
+  const userId = "user-1"; // TODO: get from auth
 
   const submitMood = async () => {
     const res = await fetch("/api/mood", {

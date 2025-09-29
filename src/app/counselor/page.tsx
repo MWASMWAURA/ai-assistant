@@ -20,7 +20,6 @@ interface Call {
 }
 
 export default function CounselorDashboard() {
-  const [counselor, setCounselor] = useState<any>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [isAvailable, setIsAvailable] = useState(false);
 
@@ -34,7 +33,6 @@ export default function CounselorDashboard() {
     const response = await fetch("/api/counselor/profile");
     if (response.ok) {
       const data = await response.json();
-      setCounselor(data);
       setIsAvailable(data.status === "available");
     }
   };

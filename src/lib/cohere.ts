@@ -37,12 +37,21 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
   }))
 
   try {
+    // Simple language detection for Swahili
+    const swahiliWords = ['habari', 'asante', 'sijambo', 'karibu', 'pole', 'samahani', 'tafadhali', 'kujiua', 'kujidhuru', 'msaada']
+    const isSwahili = swahiliWords.some(word => input.toLowerCase().includes(word))
+
+    // Multilingual preamble
+    const preamble = isSwahili ?
+      'Wewe ni msaidizi wa afya ya akili mwenye huruma. Sikiliza kwa makini, toa msaada, na gundua ikiwa mtumiaji anahitaji msaada wa kitaalamu. Ikiwa wanataja kujiua au kujidhuru, pendekeza msaada wa haraka. Jibu kwa Kiswahili.' :
+      'You are a compassionate mental health AI assistant. Listen actively, provide support, and detect if the user needs professional help. If they mention suicide or self-harm, suggest immediate help. Respond in the same language as the user.'
+
     // Add timeout to prevent hanging
     const chatPromise = cohere.chat({
       model: 'command-r-plus-08-2024',
       message: input,
       chatHistory,
-      preamble: 'You are a compassionate mental health AI assistant. Listen actively, provide support, and detect if the user needs professional help. If they mention suicide or self-harm, suggest immediate help.',
+      preamble,
       maxTokens: 150
     })
 
@@ -50,7 +59,7 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
       setTimeout(() => reject(new Error('AI response timeout')), 10000) // 10 seconds
     )
 
-    const response = await Promise.race([chatPromise, timeoutPromise]) as any
+    const response = await Promise.race([chatPromise, timeoutPromise]) as { text: string }
 
     const aiResponse = response.text || 'I\'m here to listen.'
 
@@ -63,18 +72,23 @@ export async function getAIResponse(input: string, callId: string): Promise<AIRe
       }
     })
 
-    // Check for escalation
+    // Check for escalation (English and Swahili)
     const needsEscalation = input.toLowerCase().includes('suicide') ||
-                           input.toLowerCase().includes('kill myself') ||
-                           input.toLowerCase().includes('self-harm') ||
-                           input.toLowerCase().includes('professional') ||
-                           input.toLowerCase().includes('therapist') ||
-                           input.toLowerCase().includes('counselor') ||
-                           input.toLowerCase().includes('help me professionally')
+                            input.toLowerCase().includes('kill myself') ||
+                            input.toLowerCase().includes('self-harm') ||
+                            input.toLowerCase().includes('professional') ||
+                            input.toLowerCase().includes('therapist') ||
+                            input.toLowerCase().includes('counselor') ||
+                            input.toLowerCase().includes('help me professionally') ||
+                            input.toLowerCase().includes('kujiua') || // Swahili for suicide
+                            input.toLowerCase().includes('kujidhuru') || // self-harm
+                            input.toLowerCase().includes('msaada wa kitaalamu') || // professional help
+                            input.toLowerCase().includes('daktari wa akili') // mental doctor
 
     let escalationReason = ''
     if (needsEscalation) {
-      if (input.toLowerCase().includes('suicide') || input.toLowerCase().includes('kill myself') || input.toLowerCase().includes('self-harm')) {
+      if (input.toLowerCase().includes('suicide') || input.toLowerCase().includes('kill myself') || input.toLowerCase().includes('self-harm') ||
+          input.toLowerCase().includes('kujiua') || input.toLowerCase().includes('kujidhuru')) {
         escalationReason = 'crisis'
       } else {
         escalationReason = 'requested_professional'

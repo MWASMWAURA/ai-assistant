@@ -13,7 +13,7 @@ export async function GET() {
         name: true,
         email: true,
         phone: true,
-        isAvailable: true,
+        status: true,
         specialties: true,
         license: true,
         bio: true
@@ -24,7 +24,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Counselor not found' }, { status: 404 })
     }
 
-    return NextResponse.json(counselor)
+    // Map for frontend
+    const mappedCounselor = {
+      ...counselor,
+      isAvailable: counselor.status === 'available',
+      specialties: counselor.specialties ? JSON.parse(counselor.specialties) : []
+    }
+
+    return NextResponse.json(mappedCounselor)
   } catch (error) {
     console.error('Profile error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -42,7 +49,7 @@ export async function PUT(request: NextRequest) {
         name,
         email,
         phone,
-        specialties,
+        specialties: JSON.stringify(specialties),
         license,
         bio
       },
@@ -58,7 +65,14 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(updatedCounselor)
+    // Map for frontend
+    const mappedCounselor = {
+      ...updatedCounselor,
+      isAvailable: updatedCounselor.status === 'available',
+      specialties: updatedCounselor.specialties ? JSON.parse(updatedCounselor.specialties) : []
+    }
+
+    return NextResponse.json(mappedCounselor)
   } catch (error) {
     console.error('Profile update error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

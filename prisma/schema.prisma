@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -18,7 +18,7 @@ model User {
   role        String   // 'user' or 'counselor'
   // Counselor-specific fields
   status      String?  @default("available") // 'available', 'busy', 'offline'
-  specialties String[] // Areas of expertise
+  specialties String? // Areas of expertise (JSON array)
   license     String?  // Professional license info
   bio         String?  // Professional bio
   createdAt   DateTime @default(now())
